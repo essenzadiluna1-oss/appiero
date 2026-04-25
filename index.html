@@ -300,7 +300,151 @@ function checked(id){return [...document.querySelectorAll("#"+id+" input:checked
 
 function showChecklist(id){const j=jobs.find(x=>x.id===id);if(!j)return;const c=j.checklist||{};const opts=["Accesso difficile","Terreno in pendenza","Scala necessaria","Motosega necessaria","Rami secchi","Chioma troppo fitta","Possibili malattie","Trattamenti recenti","Rischio sicurezza","Serve aiuto secondo operatore"];document.getElementById("modalTitle").textContent="Checklist sopralluogo";document.getElementById("modalBody").innerHTML=`<div class="card"><p class="muted small">Compila prima di iniziare o durante il sopralluogo.</p><div id="clItems" class="checkgrid">${opts.map(o=>`<label class="check"><input type="checkbox" value="${esc(o)}" ${(c.items||[]).includes(o)?"checked":""}><span>${esc(o)}</span></label>`).join("")}</div><label><span>Difficoltà lavoro</span><select id="clDifficulty"><option></option><option>Bassa</option><option>Media</option><option>Alta</option><option>Molto alta</option></select></label><label><span>Attrezzi / mezzi necessari</span><textarea id="clTools">${esc(c.tools||"")}</textarea></label><label><span>Note sopralluogo</span><textarea id="clNotes">${esc(c.notes||"")}</textarea></label><button class="btn-main btn-full" onclick="saveChecklist('${id}')">Salva checklist</button></div>`;document.getElementById("clDifficulty").value=c.difficulty||"";openModal()}
 function saveChecklist(id){const j=jobs.find(x=>x.id===id);j.checklist={items:checked("clItems"),difficulty:document.getElementById("clDifficulty").value,tools:document.getElementById("clTools").value.trim(),notes:document.getElementById("clNotes").value.trim()};save();toast("Checklist salvata");openJob(id)}
+function aiTextBlock(ai){
+  if(!ai) return "";
 
+  const symptoms = (ai.visibleSymptoms || []).length
+    ? ai.visibleSymptoms.map(x => "- " + x).join("\n")
+    : "- Nessun sintomo chiaro rilevato";
+
+  const problems = (ai.suspectedProblems || []).length
+    ? ai.suspectedProblems.map(x => "- " + x).join("\n")
+    : "- Nessun problema evidente rilevato";
+
+  return [
+    "ANALISI AI FOTO OLIVO",
+    "",
+    "Condizione: " + (ai.condition || "Da controllare"),
+    "Priorità: " + (ai.priority || "Media"),
+    "Confidenza: " + (ai.confidence || "bassa"),
+    "Qualità foto: " + (ai.photoQuality || "media"),
+    "",
+    "Sintomi visibili:",
+    symptoms,
+    "",
+    "Problemi sospetti:",
+    problems,
+    "",
+    "Consiglio:",
+    ai.advice || "Monitorare la pianta e confrontare con altre foto.",
+    "",
+    "Prime cure / controllo:",
+    ai.cureAdvice || "Controllare di nuovo la pianta nei prossimi giorni.",
+    "",
+    ai.needsAgronomist ? "Serve controllo agronomo/tecnico: SÌ" : "Serve controllo agronomo/tecnico: non urgente",
+    "",
+    ai.warning || "Analisi indicativa da foto. Non sostituisce agronomo, laboratorio o servizio fitosanitario."
+  ].join("\n");
+}
+
+function addDaysISO(days){
+  const d = new Date();
+  d.setDate(d.getDate() + Number(days || 15));
+  return d.toISOString().slice(0,10);
+}
+
+async function analyzeOlivePhotoAI(){
+  const file = document.getElementById("hPhoto")?.files?.[0];
+
+  if(!file){
+    return toast("Scatta o scegli prima una foto");
+  }
+
+  const btn = document.getElementById("aiAnalyzeBtn");
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = "🤖 Analisi in corso...";
+  }
+
+  currentHealthAI = null;
+  toast("Analisi AI in corso...");
+
+  try{
+    const imageBase64 = await compressFile(file, 1000, 0.7);
+
+    const payload = {
+      imageBase64,
+      cultivar: document.getElementById("hCultivarHidden")?.value || "",
+      place: document.getElementById("hPlaceHidden")?.value || "",
+      photoPart: document.getElementById("hPart")?.value || "",
+      notes: document.getElementById("hNote")?.value || ""
+    };
+
+    const res = await fetch(AI_SERVER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if(!res.ok){
+      throw new Error("Server AI non disponibile");
+    }
+
+    const ai = await res.json();
+
+    currentHealthAI = ai;
+
+    if(ai.condition && document.getElementById("hCond")){
+      document.getElementById("hCond").value = ai.condition;
+    }
+
+    if(ai.priority && document.getElementById("hPri")){
+      document.getElementById("hPri").value = ai.priority;
+    }
+
+    if(ai.nextCheckDays && document.getElementById("hNext")){
+      document.getElementById("hNext").value = addDaysISO(ai.nextCheckDays);
+    }
+
+    const box = document.getElementById("aiResultBox");
+    if(box){
+      box.style.display = "block";
+      box.innerHTML = `
+        <h3>🤖 Risultato AI</h3>
+        <div class="info-box">
+          <strong>Condizione:</strong> ${esc(ai.condition || "Da controllare")}<br>
+          <strong>Priorità:</strong> ${esc(ai.priority || "Media")}<br>
+          <strong>Confidenza:</strong> ${esc(ai.confidence || "bassa")}<br>
+          <strong>Qualità foto:</strong> ${esc(ai.photoQuality || "media")}
+        </div>
+        <div class="info-box">
+          <strong>Sintomi visibili:</strong><br>
+          ${(ai.visibleSymptoms || []).map(x => `<span class="tag tag-blue">${esc(x)}</span>`).join("") || `<span class="muted small">Nessun sintomo chiaro.</span>`}
+        </div>
+        <div class="info-box">
+          <strong>Problemi sospetti:</strong><br>
+          ${(ai.suspectedProblems || []).map(x => `<span class="tag tag-red">${esc(x)}</span>`).join("") || `<span class="muted small">Nessun sospetto forte.</span>`}
+        </div>
+        <div class="info-box">
+          <strong>Consiglio:</strong><br>${esc(ai.advice || "")}
+        </div>
+        <div class="info-box">
+          <strong>Prime cure / controllo:</strong><br>${esc(ai.cureAdvice || "")}
+        </div>
+        <p class="muted small">${esc(ai.warning || "Analisi indicativa da foto. Non sostituisce agronomo.")}</p>
+      `;
+    }
+
+    const note = document.getElementById("hNote");
+    if(note){
+      const old = note.value.trim();
+      note.value = old ? old + "\n\n" + aiTextBlock(ai) : aiTextBlock(ai);
+    }
+
+    toast("Analisi AI completata");
+
+  }catch(e){
+    console.error(e);
+    toast("Errore AI: controlla server o connessione");
+  }finally{
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = "🤖 Analizza foto con AI";
+    }
+  }
+}
 function showHealth(id){const j=jobs.find(x=>x.id===id);if(!j)return;document.getElementById("modalTitle").textContent="Salute guidata olivo";document.getElementById("modalBody").innerHTML=`<div class="card"><p class="muted small">Analisi guidata di campo. Non sostituisce l’agronomo.</p><div class="info-box"><strong>Cliente:</strong> ${esc(j.client)}<br><strong>Telefono:</strong> ${esc(j.phone||"non inserito")}<br><strong>Luogo:</strong> ${esc(j.place||"non indicato")}<br><strong>Cultivar inserita:</strong> ${esc(j.cultivar||"non indicata")}</div><label><span>Data</span><input id="hDate" type="date" value="${todayISO()}"></label><label><span>Pianta / zona</span><input id="hTree" placeholder="Es. fila 2, pianta 14"></label><label><span>Parte fotografata</span><select id="hPart"><option>Chioma intera</option><option>Foglie</option><option>Rami</option><option>Tronco</option><option>Corteccia</option><option>Olive/frutti</option><option>Terreno</option></select></label><label><span>Condizione generale</span><select id="hCond"><option>Buona</option><option>Media</option><option>Da controllare</option><option>Grave</option></select></label><label><span>Priorità</span><select id="hPri"><option>Bassa</option><option>Media</option><option>Alta</option><option>Urgente</option></select></label><label><span>Prossimo controllo</span><input id="hNext" type="date"></label><label><span>Foto salute / AI futura</span><input id="hPhoto" type="file" accept="image/*" onchange="preview(this,'hPrev')"></label><div id="hPrev" class="preview"></div><h3>Sintomi</h3><div id="symptoms" class="checkgrid">${["Foglie macchiate","Macchie tonde scure sulle foglie","Foglie gialle","Caduta foglie","Rami secchi","Disseccamento da un solo lato","Noduli / tumori su rami","Presenza insetti","Patina bianca / scudetti su rami","Stress idrico","Ferite da potatura","Marciume / carie del legno","Disseccamento rapido sospetto","Frutti rovinati","Pianta poco produttiva","Chioma troppo fitta","Macchie gialle sui rami","Patina giallo-verde sui rami","Licheni / muschio sui rami","Croste sulla corteccia","Corteccia alterata","Chioma troppo fitta e umida"].map(check).join("")}</div><label><span>Note</span><textarea id="hNote" placeholder="Es. macchie giallo-verdi sui rami, ramo vivo o secco, chioma fitta..."></textarea></label><button class="btn-main btn-full" onclick="addHealth('${id}')">Salva analisi salute</button></div>`;openModal()}
 
 function diagnose(sym,cond,pri){const s=new Set(sym),problems=[],advice=[],cures=[];let level="Basso";const add=x=>{if(!problems.includes(x))problems.push(x)};const adv=x=>{if(!advice.includes(x))advice.push(x)};const cur=x=>{if(!cures.includes(x))cures.push(x)};const med=()=>{if(level==="Basso")level="Medio"};const high=()=>level="Alto";if(s.has("Macchie tonde scure sulle foglie")||s.has("Foglie macchiate")){add("Sospetto occhio di pavone");adv("Macchie fogliari compatibili con problema fungino. Controllare foglie sopra/sotto e caduta fogliare.");cur("Arieggiare la chioma; evitare chioma troppo fitta; valutare trattamento con tecnico se diffuso.");med()}if(s.has("Noduli / tumori su rami")){add("Sospetta rogna dell’olivo");adv("Noduli o tumori sui rami possono indicare rogna, spesso legata a ferite e tagli.");cur("Disinfettare attrezzi; evitare potatura con pioggia o piante bagnate.");med()}if(s.has("Presenza insetti")||s.has("Patina bianca / scudetti su rami")){add("Possibile cocciniglia o insetti");adv("Presenza di insetti, scudetti o patina richiede controllo ravvicinato.");cur("Fare foto ravvicinate; verificare pagina inferiore foglie e rami.");med()}if(s.has("Disseccamento da un solo lato")){add("Possibile verticilliosi / problema radicale");adv("Seccume localizzato su un lato può indicare problema vascolare o radicale.");cur("Segnare la pianta; monitorare evoluzione; evitare tagli drastici prima di capire la causa.");med()}if(s.has("Stress idrico")||s.has("Foglie gialle")){add("Possibile stress idrico o carenza");adv("Ingiallimento e stress possono dipendere da acqua, nutrizione, radici o stagione.");cur("Evitare potatura pesante su pianta stressata; controllare terreno e vigoria.")}if(s.has("Macchie gialle sui rami")||s.has("Patina giallo-verde sui rami")||s.has("Licheni / muschio sui rami")||s.has("Croste sulla corteccia")){add("Possibile lichene / muschio / patina superficiale sui rami");adv("La patina giallo-verde sui rami di solito non è una malattia diretta dell’olivo, ma può indicare chioma fitta, umidità persistente, poca aerazione o pianta indebolita.");cur("Arieggiare la chioma con potatura equilibrata. Eliminare rami secchi, incrociati o troppo interni. Controllare se sotto la patina la corteccia è viva.")}if(s.has("Corteccia alterata")){add("Corteccia alterata da controllare");adv("Alterazioni della corteccia vanno valutate insieme a seccume, carie, ferite o perdita di tessuto.");cur("Non grattare inutilmente la corteccia. Se il ramo è secco o la corteccia si stacca, far controllare.");med()}if(s.has("Disseccamento rapido sospetto")){add("Disseccamento grave da verificare");add("Xylella / disseccamento sospetto da escludere con tecnico");adv("Disseccamento rapido e anomalo non va interpretato solo dall’app.");cur("Sentire agronomo o servizio fitosanitario se rapido, diffuso o su più piante.");high()}if(cond==="Grave"||pri==="Urgente")high();if(pri==="Alta")med();if(!problems.length){add("Nessun sospetto forte dai dati inseriti");adv("Dai sintomi inseriti non emerge un problema chiaro.");cur("Monitorare e salvare nuove foto se compaiono sintomi.")}return {problems,level,advice:advice.join(" "),cures:cures.join(" ")}}
