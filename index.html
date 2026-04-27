@@ -381,8 +381,12 @@ async function analyzeOlivePhotoAI(){
     });
 
     if(!res.ok){
-      throw new Error("Server AI non disponibile");
-    }
+  let errorText = "";
+  try{
+    errorText = await res.text();
+  }catch(_){}
+  throw new Error("Server AI " + res.status + " " + errorText.slice(0,120));
+}
 
     const ai = await res.json();
     currentHealthAI = ai;
@@ -435,11 +439,10 @@ async function analyzeOlivePhotoAI(){
     }
 
     toast("Analisi AI completata");
-
-  }catch(e){
-    console.error(e);
-    toast("Errore AI: controlla server o connessione");
-  }finally{
+}catch(e){
+  console.error(e);
+  toast("Errore AI: " + (e.message || e));
+}finally{
     if(btn){
       btn.disabled = false;
       btn.textContent = "🤖 Analizza foto con AI";
