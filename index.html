@@ -368,7 +368,7 @@ async function analyzeOlivePhotoAI(){
   toast("Analisi AI in corso...");
 
   try{
-    const imageBase64 = await compressFile(file, 1000, 0.7);
+    const imageBase64 = await compressFile(file, 700, 0.45);
 
     const payload = {
       imageBase64,
