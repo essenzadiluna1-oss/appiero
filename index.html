@@ -528,6 +528,13 @@ async function lightenPhotos(){if(!confirm("Alleggerisco le foto già salvate. P
 function clearAll(){if(!confirm("Cancellare tutti i dati?"))return;if(!confirm("Confermi definitivamente?"))return;jobs=[];localStorage.removeItem(STORAGE_KEY);save();toast("Dati cancellati")}
 
 function init(){document.getElementById("todayText").textContent=new Date().toLocaleDateString("it-IT",{weekday:"long",day:"2-digit",month:"long"});document.getElementById("fDate").value=todayISO();setupZoom();load();priceLabel()}
+  if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/appiero/sw.js")
+      .then(() => console.log("Service worker ApPiero registrato"))
+      .catch(err => console.log("Service worker non registrato", err));
+  });
+}
 init();
 </script>
 </body>
