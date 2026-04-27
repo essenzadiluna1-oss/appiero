@@ -35,7 +35,131 @@ app.get("/", (req, res) => {
     status: "ok"
   });
 });
+app.post("/api/recognize-cultivar", async (req, res) => {
+app.post("/api/recognize-cultivar", async (req, res) => {
+  try {
+    const {
+      leafImageBase64,
+      fruitImageBase64,
+      treeImageBase64,
+      place,
+      season,
+      oliveShape,
+      oliveSize,
+      treeHabit,
+      notes
+    } = req.body;
 
+    const images = [];
+
+    if (leafImageBase64 && String(leafImageBase64).startsWith("data:image")) {
+      images.push({
+        type: "input_image",
+        image_url: leafImageBase64,
+        detail: "auto"
+      });
+    }
+
+    if (fruitImageBase64 && String(fruitImageBase64).startsWith("data:image")) {
+      images.push({
+        type: "input_image",
+        image_url: fruitImageBase64,
+        detail: "auto"
+      });
+    }
+
+    if (treeImageBase64 && String(treeImageBase64).startsWith("data:image")) {
+      images.push({
+        type: "input_image",
+        image_url: treeImageBase64,
+        detail: "auto"
+      });
+    }
+
+    if (!images.length) {
+      return res.status(400).json({
+        error: "Serve almeno una foto per riconoscere la cultivar"
+      });
+    }
+
+    const prompt = `
+Devi aiutare un potatore a riconoscere in modo indicativo la cultivar/tipo di olivo.
+
+Contesto:
+- Luogo / comune / zona: ${place || "non indicato"}
+- Periodo dell'anno: ${season || "non indicato"}
+- Forma oliva: ${oliveShape || "non indicata"}
+- Dimensione oliva: ${oliveSize || "non indicata"}
+- Portamento pianta: ${treeHabit || "non indicato"}
+- Note potatore: ${notes || "nessuna"}
+
+Foto disponibili:
+- Foglia: ${leafImageBase64 ? "sì" : "no"}
+- Frutto/oliva: ${fruitImageBase64 ? "sì" : "no"}
+- Pianta/chioma: ${treeImageBase64 ? "sì" : "no"}
+
+Regole:
+- Non dare mai certezza assoluta.
+- Il risultato deve essere indicativo.
+- Usa cultivar italiane quando plausibili: Leccino, Frantoio, Moraiolo, Pendolino, Coratina, Ogliarola, Nocellara, Taggiasca, Carolea, Itrana, Ascolana, Cellina, Maiatica, Rotondella o altre se coerenti.
+- Valuta forma foglia, colore foglia, portamento, dimensione frutto, forma frutto, maturazione, zona geografica.
+- Se le foto non bastano, dillo chiaramente.
+- Dai alternative possibili.
+- Spiega cosa fotografare meglio per aumentare precisione.
+
+Rispondi SOLO con JSON valido:
+
+{
+  "mostLikelyCultivar": "",
+  "confidence": "bassa | media | alta",
+  "alternatives": [],
+  "visualReasons": [],
+  "fieldReasons": [],
+  "missingPhotos": [],
+  "whatToPhotographBetter": [],
+  "shortAdvice": "",
+  "warning": "Riconoscimento indicativo da foto e dati di campo. Non sostituisce un agronomo o analisi varietale."
+}
+`;
+
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: prompt
+            },
+            ...images
+          ]
+        }
+      ]
+    });
+
+    const json = safeJsonFromText(response.output_text || "");
+
+    res.json({
+      mostLikelyCultivar: json.mostLikelyCultivar || "Non determinata",
+      confidence: json.confidence || "bassa",
+      alternatives: Array.isArray(json.alternatives) ? json.alternatives : [],
+      visualReasons: Array.isArray(json.visualReasons) ? json.visualReasons : [],
+      fieldReasons: Array.isArray(json.fieldReasons) ? json.fieldReasons : [],
+      missingPhotos: Array.isArray(json.missingPhotos) ? json.missingPhotos : [],
+      whatToPhotographBetter: Array.isArray(json.whatToPhotographBetter) ? json.whatToPhotographBetter : [],
+      shortAdvice: json.shortAdvice || "",
+      warning: json.warning || "Riconoscimento indicativo da foto e dati di campo. Non sostituisce un agronomo o analisi varietale."
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: "Riconoscimento cultivar non riuscito",
+      detail: String(err.message || err)
+    });
+  }
+});
 app.post("/api/analyze-olive", async (req, res) => {
   try {
     const { imageBase64, cultivar, place, photoPart, notes } = req.body;
