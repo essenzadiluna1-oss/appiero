@@ -220,6 +220,7 @@ const OLD_KEYS=["appiero_v89_jobs","appiero_v88_jobs","appiero_v87_jobs","appier
 let jobs=[],jobFilter="all",clientSort="name";
   let currentHealthAI=null;
 const AI_SERVER_URL="https://name-appiero-ai.onrender.com/api/analyze-olive";
+const CULTIVAR_SERVER_URL="https://name-appiero-ai.onrender.com/api/recognize-cultivar";
 const euro=new Intl.NumberFormat("it-IT",{style:"currency",currency:"EUR"});
 let viewerScale=1,viewerX=0,viewerY=0,isDragging=false,dragStartX=0,dragStartY=0,startX=0,startY=0,lastTap=0,pinchStartDist=0,pinchStartScale=1;
 
@@ -286,7 +287,7 @@ function getClients(){const m=new Map();jobs.forEach(j=>{const k=(j.client||"Sen
 function renderClients(){const q=(document.getElementById("clientSearch")?.value||"").toLowerCase().trim();let list=getClients().filter(c=>!q||[c.name,c.phone,[...c.places].join(" ")].join(" ").toLowerCase().includes(q));if(clientSort==="name")list.sort((a,b)=>a.name.localeCompare(b.name));if(clientSort==="due")list.sort((a,b)=>b.due-a.due);if(clientSort==="paid")list.sort((a,b)=>b.paid-a.paid);if(clientSort==="health")list.sort((a,b)=>b.hp-a.hp);document.getElementById("clientsList").innerHTML=list.length?list.map(c=>`<div class="client"><div class="topline"><div><div class="client-title">${esc(c.name)}</div><div class="muted"><strong>Telefono:</strong> ${esc(c.phone||"non inserito")}</div><div class="muted small"><strong>Luogo:</strong> ${esc([...c.places].join(" · ")||"non indicato")}</div></div><span class="badge b-prev">${c.jobs.length} lavori</span></div><div class="mini"><div><b>${c.trees}</b><span>ulivi</span></div><div><b class="paid">${money(c.paid)}</b><span>incassato</span></div><div><b class="due">${money(c.due)}</b><span>saldo</span></div></div><div class="btn-row"><button class="btn-main" onclick="openClient('${esc(c.key)}')">Apri cliente</button><button class="btn-call" onclick="callPhone('${esc(c.phone||"")}')">📞 Chiama</button><button class="btn-wa" onclick="whatsPhone('${esc(c.phone||"")}','${esc(c.name)}')">WhatsApp</button></div></div>`).join(""):`<div class="empty">Nessun cliente trovato.</div>`}
 function openClient(key){const c=getClients().find(x=>x.key===key);if(!c)return;document.getElementById("modalTitle").textContent=c.name;document.getElementById("modalBody").innerHTML=`<div class="card"><h3>${esc(c.name)}</h3><p class="muted"><strong>Telefono:</strong> ${esc(c.phone||"non inserito")}</p><p class="muted small"><strong>Luogo:</strong> ${esc([...c.places].join(" · ")||"non indicato")}</p><div class="btn-row"><button class="btn-call" onclick="callPhone('${esc(c.phone||"")}')">📞 Chiama cliente</button><button class="btn-wa" onclick="whatsPhone('${esc(c.phone||"")}','${esc(c.name)}')">WhatsApp</button></div><div class="mini"><div><b>${c.jobs.length}</b><span>lavori</span></div><div><b>${c.trees}</b><span>ulivi</span></div><div><b class="due">${money(c.due)}</b><span>saldo</span></div></div></div><h2>Lavori cliente</h2>${c.jobs.map(jobCard).join("")}`;openModal()}
 
-function openJob(id){const j=jobs.find(x=>x.id===id);if(!j)return;document.getElementById("modalTitle").textContent=j.client;document.getElementById("modalBody").innerHTML=`<div class="card"><h3>${esc(j.client)}</h3><div class="info-box"><div><strong>Cliente:</strong> ${esc(j.client)}</div><div><strong>Telefono:</strong> ${esc(j.phone||"non inserito")}</div><div><strong>Luogo:</strong> ${esc(j.place||"non indicato")}</div><div><strong>Data prevista:</strong> ${dateIt(j.startDate)}</div><div><strong>Cultivar:</strong> ${esc(j.cultivar||"non indicata")}</div><div><strong>Tipo lavoro:</strong> ${esc(j.workType)}</div></div><div class="btn-row"><button class="btn-call" onclick="callClient('${j.id}')">📞 Chiama cliente</button><button class="btn-wa" onclick="whatsJob('${j.id}')">WhatsApp</button><button class="btn-blue" onclick="openMapsPlace('${esc(j.place||"")}')">📍 Apri Maps</button><button class="btn-gold" onclick="showReport('${j.id}')">📄 Rapporto</button><button class="btn-ai" onclick="showChecklist('${j.id}')">✅ Checklist sopralluogo</button></div><div class="mini"><div><b>${j.totalTrees}</b><span>ulivi</span></div><div><b>${doneTrees(j)}</b><span>potati</span></div><div><b>${progress(j)}%</b><span>avanzamento</span></div></div><div class="mini"><div><b>${money(estimate(j))}</b><span>preventivo</span></div><div><b class="paid">${money(paid(j))}</b><span>incassato</span></div><div><b class="due">${money(due(j))}</b><span>saldo</span></div></div><p class="muted small">${esc(j.notes||"Nessuna nota")}</p><div class="btn-row"><button class="btn-main" onclick="showDay('${j.id}')">➕ Giornata</button><button class="btn-blue" onclick="showHealth('${j.id}')">🩺 Salute guidata</button><button class="btn-ai" onclick="showAIFuture('${j.id}')">🤖 AI foto olivo</button><button class="btn-gold" onclick="showOil('${j.id}')">🫒 Olio</button><button class="btn-gold" onclick="showPayment('${j.id}')">💶 Pagamento</button><button onclick="showPhoto('${j.id}')">📷 Foto</button><button onclick="showEdit('${j.id}')">✏️ Modifica</button></div></div><h2>Checklist sopralluogo</h2>${renderChecklist(j)}<h2>Pagamenti</h2>${renderPayments(j)}<h2>Salute olivo</h2>${renderHealth(j)}<h2>Olio</h2>${renderOil(j)}<h2>Foto</h2>${renderPhotos(j)}<h2>Giornate</h2>${renderDays(j)}<div class="card" style="margin-top:12px;border-color:rgba(216,75,58,.55)"><button class="btn-red btn-full" onclick="deleteJob('${j.id}')">Elimina lavoro</button></div>`;openModal()}
+function openJob(id){const j=jobs.find(x=>x.id===id);if(!j)return;document.getElementById("modalTitle").textContent=j.client;document.getElementById("modalBody").innerHTML=`<div class="card"><h3>${esc(j.client)}</h3><div class="info-box"><div><strong>Cliente:</strong> ${esc(j.client)}</div><div><strong>Telefono:</strong> ${esc(j.phone||"non inserito")}</div><div><strong>Luogo:</strong> ${esc(j.place||"non indicato")}</div><div><strong>Data prevista:</strong> ${dateIt(j.startDate)}</div><div><strong>Cultivar:</strong> ${esc(j.cultivar||"non indicata")}</div><div><strong>Tipo lavoro:</strong> ${esc(j.workType)}</div></div><div class="btn-row"><button class="btn-call" onclick="callClient('${j.id}')">📞 Chiama cliente</button><button class="btn-wa" onclick="whatsJob('${j.id}')">WhatsApp</button><button class="btn-blue" onclick="openMapsPlace('${esc(j.place||"")}')">📍 Apri Maps</button><button class="btn-gold" onclick="showReport('${j.id}')">📄 Rapporto</button><button class="btn-ai" onclick="showChecklist('${j.id}')">✅ Checklist sopralluogo</button></div><div class="mini"><div><b>${j.totalTrees}</b><span>ulivi</span></div><div><b>${doneTrees(j)}</b><span>potati</span></div><div><b>${progress(j)}%</b><span>avanzamento</span></div></div><div class="mini"><div><b>${money(estimate(j))}</b><span>preventivo</span></div><div><b class="paid">${money(paid(j))}</b><span>incassato</span></div><div><b class="due">${money(due(j))}</b><span>saldo</span></div></div><p class="muted small">${esc(j.notes||"Nessuna nota")}</p><div class="btn-row"><button class="btn-main" onclick="showDay('${j.id}')">➕ Giornata</button><button class="btn-blue" onclick="showHealth('${j.id}')">🩺 Salute guidata</button><button class="btn-ai" onclick="showCultivar('${j.id}')">🌿 Riconosci cultivar</button><button class="btn-ai" onclick="showAIFuture('${j.id}')">🤖 AI foto olivo</button><button class="btn-gold" onclick="showOil('${j.id}')">🫒 Olio</button><button class="btn-gold" onclick="showPayment('${j.id}')">💶 Pagamento</button><button onclick="showPhoto('${j.id}')">📷 Foto</button><button onclick="showEdit('${j.id}')">✏️ Modifica</button></div></div><h2>Checklist sopralluogo</h2>${renderChecklist(j)}<h2>Pagamenti</h2>${renderPayments(j)}<h2>Salute olivo</h2>${renderHealth(j)}<h2>Olio</h2>${renderOil(j)}<h2>Foto</h2>${renderPhotos(j)}<h2>Giornate</h2>${renderDays(j)}<div class="card" style="margin-top:12px;border-color:rgba(216,75,58,.55)"><button class="btn-red btn-full" onclick="deleteJob('${j.id}')">Elimina lavoro</button></div>`;openModal()}
 function openModal(){document.getElementById("modal").classList.add("active")}
 function closeModal(){document.getElementById("modal").classList.remove("active")}
 function renderPayments(j){return j.payments.length?j.payments.slice().reverse().map(p=>`<div class="rowbox"><b>${dateIt(p.date)}</b> · ${esc(p.type||"Pagamento")}<br><span class="paid">${money(p.amount)}</span> · ${esc(p.method||"")}${p.note?`<br><span class="muted small">${esc(p.note)}</span>`:""}</div>`).join(""):`<div class="empty">Nessun pagamento.</div>`}
@@ -498,7 +499,223 @@ function showReport(id){const j=jobs.find(x=>x.id===id);if(!j)return;const repor
 function buildReport(j){const health=j.healthChecks.slice(-3).map(h=>`- ${dateIt(h.date)} | ${h.condition} | ${h.priority} | ${(h.suggestedProblems||[]).join(", ") || "nessun sospetto"}${h.nextCheck?` | prossimo controllo: ${dateIt(h.nextCheck)}`:""}`).join("\n")||"Nessuna scheda salute.";const oil=j.oilRecords.slice(-3).map(o=>`- ${o.year}: ${o.oilLiters||0} L, resa ${o.yieldPercent||0}%`).join("\n")||"Nessuna annata olio.";const c=j.checklist||{};return `RAPPORTO APPIERO\n\nCliente: ${j.client}\nTelefono: ${j.phone||"non inserito"}\nLuogo: ${j.place||"non indicato"}\nTipo lavoro: ${j.workType}\nCultivar: ${j.cultivar||"non indicata"}\n\nULIVI\nTotali: ${j.totalTrees}\nPotati: ${doneTrees(j)}\nRestanti: ${Math.max(0,j.totalTrees-doneTrees(j))}\nAvanzamento: ${progress(j)}%\n\nPAGAMENTI\nPreventivo: ${money(estimate(j))}\nIncassato: ${money(paid(j))}\nSaldo: ${money(due(j))}\n\nCHECKLIST SOPRALLUOGO\nVoci: ${(c.items||[]).join(", ")||"non compilata"}\nDifficoltà: ${c.difficulty||"non indicata"}\nAttrezzi/mezzi: ${c.tools||"non indicati"}\nNote sopralluogo: ${c.notes||"nessuna"}\n\nSALUTE OLIVO\n${health}\n\nPRODUZIONE OLIO\n${oil}\n\nNOTE LAVORO\n${j.notes||"Nessuna nota"}\n\nGenerato con ApPiero V9.`}
 function copyReport(){const txt=document.getElementById("reportText").innerText;navigator.clipboard?.writeText(txt).then(()=>toast("Rapporto copiato")).catch(()=>toast("Copia non riuscita"))}
 function sendReportWhatsApp(id){const j=jobs.find(x=>x.id===id);const p=cleanPhone(j.phone);if(!p)return toast("Telefono non inserito");window.open("https://wa.me/"+p+"?text="+encodeURIComponent(buildReport(j)),"_blank")}
+function cultivarList(items, cls="tag-blue"){
+  return (items || []).length
+    ? items.map(x => `<span class="tag ${cls}">${esc(x)}</span>`).join("")
+    : `<span class="muted small">Nessun dato indicato.</span>`;
+}
 
+function showCultivar(id){
+  const j = jobs.find(x => x.id === id);
+  if(!j) return;
+
+  document.getElementById("modalTitle").textContent = "Riconosci cultivar olivo";
+
+  document.getElementById("modalBody").innerHTML = `
+    <div class="card">
+      <div class="ai-box">
+        <h3>🌿 Riconoscimento cultivar</h3>
+        <p class="muted small">
+          Per essere più preciso, scatta foto separate: foglia, oliva/frutto e pianta intera.
+          Il risultato resta indicativo.
+        </p>
+      </div>
+
+      <div class="info-box">
+        <strong>Cliente:</strong> ${esc(j.client)}<br>
+        <strong>Luogo:</strong> ${esc(j.place || "non indicato")}<br>
+        <strong>Cultivar già indicata:</strong> ${esc(j.cultivar || "non indicata")}
+      </div>
+
+      <label><span>Foto foglia da vicino</span><input id="cLeafPhoto" type="file" accept="image/*" capture="environment" onchange="preview(this,'cLeafPrev')"></label>
+      <div id="cLeafPrev" class="preview"></div>
+
+      <label><span>Foto oliva / frutto se presente</span><input id="cFruitPhoto" type="file" accept="image/*" capture="environment" onchange="preview(this,'cFruitPrev')"></label>
+      <div id="cFruitPrev" class="preview"></div>
+
+      <label><span>Foto pianta intera / chioma</span><input id="cTreePhoto" type="file" accept="image/*" capture="environment" onchange="preview(this,'cTreePrev')"></label>
+      <div id="cTreePrev" class="preview"></div>
+
+      <label><span>Comune / zona</span><input id="cPlace" value="${esc(j.place || "")}" placeholder="Es. Posillipo, Napoli"></label>
+
+      <label><span>Periodo dell'anno</span>
+        <select id="cSeason">
+          <option>Non indicato</option>
+          <option>Inverno</option>
+          <option>Primavera</option>
+          <option>Estate</option>
+          <option>Autunno</option>
+        </select>
+      </label>
+
+      <label><span>Forma oliva</span>
+        <select id="cOliveShape">
+          <option>Non indicata</option>
+          <option>Tonda</option>
+          <option>Ovale</option>
+          <option>Allungata</option>
+          <option>Asimmetrica</option>
+          <option>Non presente</option>
+        </select>
+      </label>
+
+      <label><span>Dimensione oliva</span>
+        <select id="cOliveSize">
+          <option>Non indicata</option>
+          <option>Piccola</option>
+          <option>Media</option>
+          <option>Grande</option>
+          <option>Non presente</option>
+        </select>
+      </label>
+
+      <label><span>Portamento pianta</span>
+        <select id="cTreeHabit">
+          <option>Non indicato</option>
+          <option>Eretto</option>
+          <option>Espanso</option>
+          <option>Pendulo</option>
+          <option>Vigoroso</option>
+          <option>Compatto</option>
+        </select>
+      </label>
+
+      <label><span>Note del potatore</span><textarea id="cNotes" placeholder="Es. oliva piccola, foglia stretta, zona collinare, produzione..."></textarea></label>
+
+      <button id="cultivarBtn" class="btn-ai btn-full" onclick="recognizeCultivarAI('${id}')">🌿 Analizza cultivar</button>
+
+      <div id="cultivarResultBox" class="ai-box" style="display:none"></div>
+    </div>
+  `;
+
+  openModal();
+}
+
+async function recognizeCultivarAI(id){
+  const j = jobs.find(x => x.id === id);
+  if(!j) return;
+
+  const leafFile = document.getElementById("cLeafPhoto")?.files?.[0];
+  const fruitFile = document.getElementById("cFruitPhoto")?.files?.[0];
+  const treeFile = document.getElementById("cTreePhoto")?.files?.[0];
+
+  if(!leafFile && !fruitFile && !treeFile){
+    return toast("Scatta almeno una foto: foglia, oliva o pianta");
+  }
+
+  const btn = document.getElementById("cultivarBtn");
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = "🌿 Analisi cultivar in corso...";
+  }
+
+  try{
+    const leafImageBase64 = leafFile ? await compressFile(leafFile, 650, 0.38) : "";
+    const fruitImageBase64 = fruitFile ? await compressFile(fruitFile, 650, 0.38) : "";
+    const treeImageBase64 = treeFile ? await compressFile(treeFile, 650, 0.38) : "";
+
+    const payload = {
+      leafImageBase64,
+      fruitImageBase64,
+      treeImageBase64,
+      place: document.getElementById("cPlace")?.value || "",
+      season: document.getElementById("cSeason")?.value || "",
+      oliveShape: document.getElementById("cOliveShape")?.value || "",
+      oliveSize: document.getElementById("cOliveSize")?.value || "",
+      treeHabit: document.getElementById("cTreeHabit")?.value || "",
+      notes: document.getElementById("cNotes")?.value || ""
+    };
+
+    const res = await fetch(CULTIVAR_SERVER_URL, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    if(!res.ok){
+      let errorText = "";
+      try{ errorText = await res.text(); }catch(_){}
+      throw new Error("Server cultivar " + res.status + " " + errorText.slice(0,120));
+    }
+
+    const ai = await res.json();
+
+    const box = document.getElementById("cultivarResultBox");
+    if(box){
+      box.style.display = "block";
+      box.innerHTML = `
+        <h3>🌿 Risultato cultivar</h3>
+
+        <div class="info-box">
+          <strong>Cultivar più probabile:</strong><br>
+          <span class="tag tag-green">${esc(ai.mostLikelyCultivar || "Non determinata")}</span><br><br>
+          <strong>Confidenza:</strong> ${esc(ai.confidence || "bassa")}
+        </div>
+
+        <div class="info-box">
+          <strong>Alternative possibili:</strong><br>
+          ${cultivarList(ai.alternatives, "tag-gold")}
+        </div>
+
+        <div class="info-box">
+          <strong>Motivi visivi:</strong><br>
+          ${cultivarList(ai.visualReasons, "tag-blue")}
+        </div>
+
+        <div class="info-box">
+          <strong>Motivi di campo:</strong><br>
+          ${cultivarList(ai.fieldReasons, "tag-purple")}
+        </div>
+
+        <div class="info-box">
+          <strong>Cosa manca / cosa fotografare meglio:</strong><br>
+          ${cultivarList([...(ai.missingPhotos || []), ...(ai.whatToPhotographBetter || [])], "tag-red")}
+        </div>
+
+        <div class="info-box">
+          <strong>Consiglio:</strong><br>
+          ${esc(ai.shortAdvice || "Confrontare con frutto, foglia e zona prima di confermare.")}
+        </div>
+
+        <p class="muted small">${esc(ai.warning || "Riconoscimento indicativo da foto e dati di campo.")}</p>
+
+        <button class="btn-main btn-full" onclick="saveCultivarResult('${id}')">Salva cultivar nel lavoro</button>
+      `;
+    }
+
+    j.lastCultivarAI = ai;
+    save();
+
+    toast("Analisi cultivar completata");
+
+  }catch(e){
+    console.error(e);
+    toast("Errore cultivar: " + (e.message || e));
+  }finally{
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = "🌿 Analizza cultivar";
+    }
+  }
+}
+
+function saveCultivarResult(id){
+  const j = jobs.find(x => x.id === id);
+  if(!j || !j.lastCultivarAI){
+    return toast("Nessun risultato cultivar da salvare");
+  }
+
+  j.cultivar = j.lastCultivarAI.mostLikelyCultivar || j.cultivar || "";
+  j.cultivarAI = {
+    used:true,
+    result:j.lastCultivarAI,
+    savedAt:new Date().toISOString()
+  };
+
+  save();
+  toast("Cultivar salvata nel lavoro");
+  openJob(id);
+}
 function showAIFuture(id){document.getElementById("modalTitle").textContent="AI foto olivo";document.getElementById("modalBody").innerHTML=`<div class="card"><div class="ai-box"><h3>🤖 AI foto olivo — funzione futura</h3><p class="muted small">La vera AI richiederà un collegamento esterno/API. Per ora usa Salute guidata e salva foto pronte per AI.</p></div><button class="btn-blue btn-full" onclick="showHealth('${id}')">Apri Salute guidata</button></div>`;openModal()}
 function showOil(id){document.getElementById("modalTitle").textContent="Produzione olio";document.getElementById("modalBody").innerHTML=`<div class="card"><label><span>Anno</span><input id="oYear" type="number" value="${new Date().getFullYear()}"></label><label><span>Piante produttive</span><input id="oTrees" type="number"></label><label><span>Kg olive raccolte</span><input id="oKg" type="number" step="0.1"></label><label><span>Resa frantoio %</span><input id="oYield" type="number" step="0.1"></label><label><span>Olio prodotto reale L</span><input id="oLiters" type="number" step="0.1"></label><label><span>Frantoio</span><input id="oMill"></label><label><span>Note</span><textarea id="oNotes"></textarea></label><button class="btn-main btn-full" onclick="addOil('${id}')">Salva annata olio</button></div>`;openModal()}
 function addOil(id){const j=jobs.find(x=>x.id===id);j.oilRecords.push({id:uid(),year:n(document.getElementById("oYear").value),productiveTrees:n(document.getElementById("oTrees").value),oliveKg:n(document.getElementById("oKg").value),yieldPercent:n(document.getElementById("oYield").value),oilLiters:n(document.getElementById("oLiters").value),mill:document.getElementById("oMill").value.trim(),notes:document.getElementById("oNotes").value.trim()});save();toast("Annata olio salvata");openJob(id)}
