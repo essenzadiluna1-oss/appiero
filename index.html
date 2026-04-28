@@ -922,6 +922,7 @@ function renderTools(){
           <div class="muted small"><strong>Tipo:</strong> ${esc(t.type || "")} · <strong>Data:</strong> ${dateIt(t.date)}</div>
           <div class="muted small"><strong>Marca/modello:</strong> ${esc(t.brand || "non indicato")}</div>
           <div class="muted small"><strong>Venditore/officina:</strong> ${esc(t.seller || "non indicato")}</div>
+${t.linkedTo ? `<div class="muted small"><strong>Collegata a:</strong> ${esc(t.linkedTo)}</div>` : ""}
           ${t.nextMaintenance ? `<div class="muted small"><strong>Prossima manutenzione:</strong> ${dateIt(t.nextMaintenance)}</div>` : ""}
         </div>
         <span class="badge b-warn">${money(t.amount)}</span>
@@ -930,13 +931,86 @@ function renderTools(){
       ${t.notes ? `<div class="info-box">${esc(t.notes)}</div>` : ""}
 
       <div class="btn-row">
-        <button onclick="editToolExpense('${t.id}')">✏️ Modifica</button>
-        <button class="btn-red" onclick="deleteToolExpense('${t.id}')">Elimina</button>
+        <button class="btn-blue" onclick="showToolMaintenance('${t.id}')">🔧 Aggiungi manutenzione</button><button onclick="editToolExpense('${t.id}')">✏️ Modifica</button><button class="btn-red" onclick="deleteToolExpense('${t.id}')">Elimina</button>
       </div>
     </div>
   `).join("") : `<div class="empty">Nessuna spesa attrezzatura salvata.</div>`;
 }
+function showToolMaintenance(id){
+  const base = tools.find(x => x.id === id);
+  if(!base) return;
 
+  document.getElementById("modalTitle").textContent = "Aggiungi manutenzione";
+
+  document.getElementById("modalBody").innerHTML = `
+    <div class="card">
+      <div class="info-box">
+        <strong>Attrezzo:</strong> ${esc(base.name)}<br>
+        <strong>Categoria:</strong> ${esc(base.category || "non indicata")}<br>
+        <strong>Marca/modello:</strong> ${esc(base.brand || "non indicato")}
+      </div>
+
+      <label><span>Data</span><input id="mtoolDate" type="date" value="${todayISO()}"></label>
+
+      <label><span>Tipo intervento</span>
+        <select id="mtoolType">
+          <option value="manutenzione">Manutenzione</option>
+          <option value="riparazione">Riparazione</option>
+          <option value="ricambio">Ricambio</option>
+          <option value="consumabile">Consumabile</option>
+        </select>
+      </label>
+
+      <label><span>Descrizione intervento</span>
+        <input id="mtoolName" value="Manutenzione ${esc(base.name)}">
+      </label>
+
+      <label><span>Prezzo €</span><input id="mtoolAmount" type="number" min="0" step="0.01"></label>
+
+      <label><span>Officina / fornitore</span><input id="mtoolSeller" value="${esc(base.seller || "")}"></label>
+
+      <label><span>Prossima manutenzione</span><input id="mtoolNext" type="date"></label>
+
+      <label><span>Note</span><textarea id="mtoolNotes" placeholder="Es. cambio lama, affilatura, batteria, revisione..."></textarea></label>
+
+      <button class="btn-main btn-full" onclick="addToolMaintenance('${id}')">Salva manutenzione</button>
+    </div>
+  `;
+
+  openModal();
+}
+
+function addToolMaintenance(id){
+  const base = tools.find(x => x.id === id);
+  if(!base) return;
+
+  const amount = n(document.getElementById("mtoolAmount").value);
+
+  if(!amount){
+    return toast("Inserisci prezzo manutenzione");
+  }
+
+  tools.unshift({
+    id: uid(),
+    parentToolId: base.id,
+    date: document.getElementById("mtoolDate").value || todayISO(),
+    type: document.getElementById("mtoolType").value,
+    category: base.category || "Manutenzione",
+    name: document.getElementById("mtoolName").value.trim() || ("Manutenzione " + base.name),
+    brand: base.brand || "",
+    amount,
+    seller: document.getElementById("mtoolSeller").value.trim(),
+    nextMaintenance: document.getElementById("mtoolNext").value,
+    notes: document.getElementById("mtoolNotes").value.trim(),
+    linkedTo: base.name,
+    createdAt: new Date().toISOString()
+  });
+
+  saveTools();
+  toast("Manutenzione salvata");
+  closeModal();
+  showScreen("tools");
+}
 function editToolExpense(id){
   const t = tools.find(x => x.id === id);
   if(!t) return;
