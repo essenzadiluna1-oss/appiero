@@ -98,7 +98,8 @@
       <button class="btn-main" onclick="showScreen('new')">➕ Nuovo lavoro</button>
       <button class="btn-gold" onclick="showScreen('clients')">👥 Clienti</button>
       <button class="btn-blue" onclick="showScreen('jobs')">🌳 Lavori</button>
-      <button onclick="showScreen('stats')">📊 Statistiche</button>
+<button onclick="showScreen('tools')">🧰 Attrezzature</button>
+<button onclick="showScreen('stats')">📊 Statistiche</button>
     </div>
 
     <div class="ai-box">
@@ -174,7 +175,38 @@
       <div class="card"><div class="kpi-label">Olio</div><div class="kpi-value money" id="sOil">0 L</div></div>
     </div>
   </section>
+<section id="screen-tools" class="screen">
+  <div class="section-head">
+    <h2>Attrezzature</h2>
+    <button class="btn-main" onclick="showToolForm()">➕ Nuova spesa</button>
+  </div>
 
+  <div class="grid grid3">
+    <div class="card">
+      <div class="kpi-label">Totale attrezzature</div>
+      <div class="kpi-value due" id="toolTotal">0 €</div>
+      <div class="kpi-small">acquisti e manutenzioni</div>
+    </div>
+    <div class="card">
+      <div class="kpi-label">Acquisti</div>
+      <div class="kpi-value money" id="toolBuy">0 €</div>
+      <div class="kpi-small">nuovi attrezzi</div>
+    </div>
+    <div class="card">
+      <div class="kpi-label">Manutenzione</div>
+      <div class="kpi-value paid" id="toolMaint">0 €</div>
+      <div class="kpi-small">riparazioni e ricambi</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>Filtra</h3>
+    <input id="toolSearch" oninput="renderTools()" placeholder="Cerca attrezzo, categoria, note..." />
+  </div>
+
+  <h2>Registro spese</h2>
+  <div id="toolsList" class="list"></div>
+</section>
   <section id="screen-backup" class="screen">
     <h2>Backup e memoria</h2>
     <div class="card">
@@ -218,6 +250,8 @@
 const STORAGE_KEY="appiero_v90_jobs";
 const OLD_KEYS=["appiero_v89_jobs","appiero_v88_jobs","appiero_v87_jobs","appiero_v86_jobs","appiero_v85_jobs","appiero_v84_jobs","appiero_v83_jobs","appiero_v82_jobs","appiero_v81_jobs","appiero_v8_jobs","appiero_v7_jobs","appiero_v61_jobs","appiero_v6_jobs","appiero_v5_jobs","appiero_v4_jobs","appiero_v3_jobs","appiero_v2_jobs","appiero_v1_jobs"];
 let jobs=[],jobFilter="all",clientSort="name";
+let tools=[];
+const TOOLS_KEY="appiero_v10_tools";
   let currentHealthAI=null;
 const AI_SERVER_URL="https://name-appiero-ai.onrender.com/api/analyze-olive";
 const CULTIVAR_SERVER_URL="https://name-appiero-ai.onrender.com/api/recognize-cultivar";
@@ -744,8 +778,229 @@ function openMapsPlace(place){
 function cleanPhone(phone){let p=String(phone||"").replace(/[^\d+]/g,"");p=p.replace(/^\+/,"");if(p.startsWith("00"))p=p.slice(2);if(p.startsWith("39"))return p;if(p.startsWith("3"))return"39"+p;if(p.startsWith("0"))return"39"+p;return p}
 
 function renderHome(){const clients=getClients().length,totalDue=jobs.reduce((s,j)=>s+due(j),0);document.getElementById("kpiClients").textContent=clients;document.getElementById("kpiDue").textContent=money(totalDue);document.getElementById("kpiChecks").textContent=jobs.reduce((s,j)=>s+j.healthChecks.length,0);document.getElementById("homeJobs").innerHTML=jobs.length?jobs.slice(0,4).map(jobCard).join(""):`<div class="empty">Ancora nessun lavoro.</div>`;document.getElementById("memoryInfo").textContent=`Memoria V9: circa ${storageKB()} KB. Totale versioni ApPiero: circa ${totalKB()} KB.`}
+function loadTools(){
+  try{
+    tools = JSON.parse(localStorage.getItem(TOOLS_KEY) || "[]");
+  }catch(e){
+    tools = [];
+  }
+}
+
+function saveTools(){
+  try{
+    localStorage.setItem(TOOLS_KEY, JSON.stringify(tools));
+    renderTools();
+  }catch(e){
+    toast("Memoria attrezzature piena");
+  }
+}
+
+function toolTotalBy(type){
+  return tools
+    .filter(t => !type || t.type === type)
+    .reduce((s,t) => s + n(t.amount), 0);
+}
+
+function showToolForm(){
+  document.getElementById("modalTitle").textContent = "Nuova spesa attrezzatura";
+  document.getElementById("modalBody").innerHTML = `
+    <div class="card">
+      <label><span>Data</span><input id="toolDate" type="date" value="${todayISO()}"></label>
+
+      <label><span>Tipo spesa</span>
+        <select id="toolType">
+          <option value="acquisto">Acquisto</option>
+          <option value="manutenzione">Manutenzione</option>
+          <option value="riparazione">Riparazione</option>
+          <option value="ricambio">Ricambio</option>
+          <option value="consumabile">Consumabile</option>
+          <option value="altro">Altro</option>
+        </select>
+      </label>
+
+      <label><span>Categoria</span>
+        <select id="toolCategory">
+          <option>Scala</option>
+          <option>Forbici elettriche</option>
+          <option>Motosega</option>
+          <option>Decespugliatore</option>
+          <option>Abbacchiatore</option>
+          <option>Batteria</option>
+          <option>Caricabatterie</option>
+          <option>Asta telescopica</option>
+          <option>Compressore</option>
+          <option>Carburante / miscela</option>
+          <option>Olio catena</option>
+          <option>Filo / lama</option>
+          <option>Ricambi</option>
+          <option>Dispositivi sicurezza</option>
+          <option>Altro</option>
+        </select>
+      </label>
+
+      <label><span>Nome attrezzo / prodotto</span><input id="toolName" placeholder="Es. Forbici elettriche, scala 3 metri..."></label>
+
+      <label><span>Marca / modello</span><input id="toolBrand" placeholder="Es. Pellenc, Stihl, Campagnola..."></label>
+
+      <label><span>Prezzo €</span><input id="toolAmount" type="number" min="0" step="0.01"></label>
+
+      <label><span>Venditore / officina</span><input id="toolSeller" placeholder="Es. ferramenta, officina, online..."></label>
+
+      <label><span>Prossima manutenzione</span><input id="toolNext" type="date"></label>
+
+      <label><span>Note</span><textarea id="toolNotes" placeholder="Es. cambio lama, batteria nuova, tagliando, garanzia..."></textarea></label>
+
+      <button class="btn-main btn-full" onclick="addToolExpense()">Salva spesa</button>
+    </div>
+  `;
+  openModal();
+}
+
+function addToolExpense(){
+  const name = document.getElementById("toolName").value.trim();
+  const amount = n(document.getElementById("toolAmount").value);
+
+  if(!name){
+    return toast("Inserisci nome attrezzo/prodotto");
+  }
+
+  if(!amount){
+    return toast("Inserisci prezzo");
+  }
+
+  tools.unshift({
+    id: uid(),
+    date: document.getElementById("toolDate").value || todayISO(),
+    type: document.getElementById("toolType").value,
+    category: document.getElementById("toolCategory").value,
+    name,
+    brand: document.getElementById("toolBrand").value.trim(),
+    amount,
+    seller: document.getElementById("toolSeller").value.trim(),
+    nextMaintenance: document.getElementById("toolNext").value,
+    notes: document.getElementById("toolNotes").value.trim(),
+    createdAt: new Date().toISOString()
+  });
+
+  saveTools();
+  toast("Spesa attrezzatura salvata");
+  closeModal();
+  showScreen("tools");
+}
+
+function renderTools(){
+  const listBox = document.getElementById("toolsList");
+  if(!listBox) return;
+
+  const q = (document.getElementById("toolSearch")?.value || "").toLowerCase().trim();
+
+  const filtered = tools.filter(t => {
+    const txt = [t.type,t.category,t.name,t.brand,t.seller,t.notes].join(" ").toLowerCase();
+    return !q || txt.includes(q);
+  });
+
+  const total = tools.reduce((s,t) => s + n(t.amount), 0);
+  const buy = toolTotalBy("acquisto");
+  const maint = tools
+    .filter(t => ["manutenzione","riparazione","ricambio","consumabile"].includes(t.type))
+    .reduce((s,t) => s + n(t.amount), 0);
+
+  const elTotal = document.getElementById("toolTotal");
+  const elBuy = document.getElementById("toolBuy");
+  const elMaint = document.getElementById("toolMaint");
+
+  if(elTotal) elTotal.textContent = money(total);
+  if(elBuy) elBuy.textContent = money(buy);
+  if(elMaint) elMaint.textContent = money(maint);
+
+  listBox.innerHTML = filtered.length ? filtered.map(t => `
+    <div class="job">
+      <div class="topline">
+        <div>
+          <div class="job-title">${esc(t.name)}</div>
+          <div class="muted"><strong>Categoria:</strong> ${esc(t.category || "non indicata")}</div>
+          <div class="muted small"><strong>Tipo:</strong> ${esc(t.type || "")} · <strong>Data:</strong> ${dateIt(t.date)}</div>
+          <div class="muted small"><strong>Marca/modello:</strong> ${esc(t.brand || "non indicato")}</div>
+          <div class="muted small"><strong>Venditore/officina:</strong> ${esc(t.seller || "non indicato")}</div>
+          ${t.nextMaintenance ? `<div class="muted small"><strong>Prossima manutenzione:</strong> ${dateIt(t.nextMaintenance)}</div>` : ""}
+        </div>
+        <span class="badge b-warn">${money(t.amount)}</span>
+      </div>
+
+      ${t.notes ? `<div class="info-box">${esc(t.notes)}</div>` : ""}
+
+      <div class="btn-row">
+        <button onclick="editToolExpense('${t.id}')">✏️ Modifica</button>
+        <button class="btn-red" onclick="deleteToolExpense('${t.id}')">Elimina</button>
+      </div>
+    </div>
+  `).join("") : `<div class="empty">Nessuna spesa attrezzatura salvata.</div>`;
+}
+
+function editToolExpense(id){
+  const t = tools.find(x => x.id === id);
+  if(!t) return;
+
+  document.getElementById("modalTitle").textContent = "Modifica spesa attrezzatura";
+  document.getElementById("modalBody").innerHTML = `
+    <div class="card">
+      <label><span>Data</span><input id="etoolDate" type="date" value="${esc(t.date || todayISO())}"></label>
+
+      <label><span>Tipo spesa</span>
+        <select id="etoolType">
+          <option value="acquisto">Acquisto</option>
+          <option value="manutenzione">Manutenzione</option>
+          <option value="riparazione">Riparazione</option>
+          <option value="ricambio">Ricambio</option>
+          <option value="consumabile">Consumabile</option>
+          <option value="altro">Altro</option>
+        </select>
+      </label>
+
+      <label><span>Categoria</span><input id="etoolCategory" value="${esc(t.category || "")}"></label>
+      <label><span>Nome attrezzo / prodotto</span><input id="etoolName" value="${esc(t.name || "")}"></label>
+      <label><span>Marca / modello</span><input id="etoolBrand" value="${esc(t.brand || "")}"></label>
+      <label><span>Prezzo €</span><input id="etoolAmount" type="number" min="0" step="0.01" value="${n(t.amount)}"></label>
+      <label><span>Venditore / officina</span><input id="etoolSeller" value="${esc(t.seller || "")}"></label>
+      <label><span>Prossima manutenzione</span><input id="etoolNext" type="date" value="${esc(t.nextMaintenance || "")}"></label>
+      <label><span>Note</span><textarea id="etoolNotes">${esc(t.notes || "")}</textarea></label>
+
+      <button class="btn-main btn-full" onclick="saveEditToolExpense('${id}')">Salva modifiche</button>
+    </div>
+  `;
+
+  document.getElementById("etoolType").value = t.type || "acquisto";
+  openModal();
+}
+
+function saveEditToolExpense(id){
+  const t = tools.find(x => x.id === id);
+  if(!t) return;
+
+  t.date = document.getElementById("etoolDate").value || todayISO();
+  t.type = document.getElementById("etoolType").value;
+  t.category = document.getElementById("etoolCategory").value.trim();
+  t.name = document.getElementById("etoolName").value.trim() || "Senza nome";
+  t.brand = document.getElementById("etoolBrand").value.trim();
+  t.amount = n(document.getElementById("etoolAmount").value);
+  t.seller = document.getElementById("etoolSeller").value.trim();
+  t.nextMaintenance = document.getElementById("etoolNext").value;
+  t.notes = document.getElementById("etoolNotes").value.trim();
+
+  saveTools();
+  toast("Spesa modificata");
+  closeModal();
+  showScreen("tools");
+}
+
+function deleteToolExpense(id){
+  if(!confirm("Eliminare questa spesa attrezzatura?")) return;
+  tools = tools.filter(x => x.id !== id);
+  saveTools();
+  toast("Spesa eliminata");
+}
 function renderStats(){document.getElementById("sClients").textContent=getClients().length;document.getElementById("sTrees").textContent=jobs.reduce((s,j)=>s+n(j.totalTrees),0);document.getElementById("sDone").textContent=jobs.reduce((s,j)=>s+doneTrees(j),0);document.getElementById("sPaid").textContent=money(jobs.reduce((s,j)=>s+paid(j),0));document.getElementById("sDue").textContent=money(jobs.reduce((s,j)=>s+due(j),0));document.getElementById("sOil").textContent=jobs.reduce((s,j)=>s+j.oilRecords.reduce((a,o)=>a+n(o.oilLiters),0),0).toFixed(1)+" L"}
-function renderAll(){renderHome();renderClients();renderJobs();renderStats()}
+function renderAll(){renderHome();renderClients();renderJobs();renderStats();renderTools()}
 
 function backupData(includePhotos){return jobs.map(j=>{const x=JSON.parse(JSON.stringify(j));if(!includePhotos){x.photos=[];x.photoItems=(x.photoItems||[]).map(p=>({...p,src:""}));x.days=(x.days||[]).map(d=>({...d,photo:""}));x.healthChecks=(x.healthChecks||[]).map(h=>({...h,photo:""}))}return x})}
 function exportBackup(includePhotos){const fileName=(includePhotos?"BACKUP-APPIERO-COMPLETO-":"BACKUP-APPIERO-LEGGERO-")+todayISO()+".json";const data={app:"ApPiero",version:"9.0",photos:includePhotos,exportedAt:new Date().toISOString(),jobs:backupData(includePhotos)};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=fileName;a.click();URL.revokeObjectURL(url);const msg=document.getElementById("backupMsg");if(msg){msg.style.display="block";msg.innerHTML=`<strong>Backup esportato.</strong><br>Nome file:<br><strong>${fileName}</strong><br><br>Cercalo in:<br><strong>File → Memoria interna → Download</strong>`}toast("Backup salvato in Download")}
@@ -754,7 +1009,7 @@ function cleanOld(){if(!confirm("Pulisco vecchie versioni, V9 resta. Procedo?"))
 async function lightenPhotos(){if(!confirm("Alleggerisco le foto già salvate. Procedo?"))return;for(const j of jobs){for(const p of j.photoItems){if(p.src)p.src=await recompressDataUrl(p.src)}for(const h of j.healthChecks){if(h.photo)h.photo=await recompressDataUrl(h.photo)}j.photos=j.photoItems.filter(p=>p.src).map(p=>p.src)}save();toast("Foto alleggerite")}
 function clearAll(){if(!confirm("Cancellare tutti i dati?"))return;if(!confirm("Confermi definitivamente?"))return;jobs=[];localStorage.removeItem(STORAGE_KEY);save();toast("Dati cancellati")}
 
-function init(){document.getElementById("todayText").textContent=new Date().toLocaleDateString("it-IT",{weekday:"long",day:"2-digit",month:"long"});document.getElementById("fDate").value=todayISO();setupZoom();load();priceLabel()}
+function init(){document.getElementById("todayText").textContent=new Date().toLocaleDateString("it-IT",{weekday:"long",day:"2-digit",month:"long"});document.getElementById("fDate").value=todayISO();setupZoom();load();loadTools();priceLabel()}
   if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/appiero/sw.js")
