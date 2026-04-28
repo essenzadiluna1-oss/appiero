@@ -36,7 +36,7 @@ app.get("/", (req, res) => {
   });
 });
 app.post("/api/recognize-cultivar", async (req, res) => {
-app.post("/api/recognize-cultivar", async (req, res) => {
+
   try {
     const {
       leafImageBase64,
