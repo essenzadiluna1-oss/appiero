@@ -568,13 +568,13 @@ function showCultivar(id){
         <strong>Cultivar già indicata:</strong> ${esc(j.cultivar || "non indicata")}
       </div>
 
-      <label><span>Foto foglia da vicino</span><input id="cLeafPhoto" type="file" accept="image/*" capture="environment" onchange="preview(this,'cLeafPrev')"></label>
+      <label><span>Foto foglia da vicino</span><input id="cLeafPhoto" type="file" accept="image/*" onchange="preview(this,'cLeafPrev')"></label>
       <div id="cLeafPrev" class="preview"></div>
 
       <label><span>Foto oliva / frutto se presente</span><input id="cFruitPhoto" type="file" accept="image/*" capture="environment" onchange="preview(this,'cFruitPrev')"></label>
       <div id="cFruitPrev" class="preview"></div>
 
-      <label><span>Foto pianta intera / chioma</span><input id="cTreePhoto" type="file" accept="image/*" capture="environment" onchange="preview(this,'cTreePrev')"></label>
+      <label><span>Foto pianta intera / chioma</span><input id="cTreePhoto" type="file" accept="image/*" onchange="preview(this,'cTreePrev')"></label>
       <div id="cTreePrev" class="preview"></div>
 
       <label><span>Comune / zona</span><input id="cPlace" value="${esc(j.place || "")}" placeholder="Es. Posillipo, Napoli"></label>
