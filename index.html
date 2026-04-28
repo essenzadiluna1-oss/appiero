@@ -291,7 +291,15 @@ function normalize(j){
 }
 function load(){let raw=localStorage.getItem(STORAGE_KEY);if(!raw){for(const k of OLD_KEYS){raw=localStorage.getItem(k);if(raw)break}}try{jobs=JSON.parse(raw||"[]").map(normalize)}catch(e){jobs=[]}save()}
 function priceLabel(){const m=document.getElementById("fPriceMode").value;document.getElementById("fPriceLabel").textContent=m==="tree"?"Prezzo a ulivo €":m==="day"?"Prezzo a giornata €":"Prezzo a corpo €"}
-
+function fileToDataUrl(file){
+  return new Promise((resolve)=>{
+    if(!file) return resolve("");
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result || "");
+    r.onerror = () => resolve("");
+    r.readAsDataURL(file);
+  });
+}
 function compressFile(file,maxW=560,q=.45){return new Promise((resolve)=>{if(!file)return resolve("");const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>maxW){h=Math.round(h*(maxW/w));w=maxW}const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);resolve(c.toDataURL("image/jpeg",q))};img.onerror=()=>resolve("");img.src=e.target.result};r.onerror=()=>resolve("");r.readAsDataURL(file)})}
 function recompressDataUrl(src,maxW=520,q=.42){return new Promise(resolve=>{if(!src||!String(src).startsWith("data:image"))return resolve(src||"");const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>maxW){h=Math.round(h*(maxW/w));w=maxW}const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);resolve(c.toDataURL("image/jpeg",q))};img.onerror=()=>resolve(src);img.src=src})}
 function preview(input,id){const box=document.getElementById(id),file=input.files&&input.files[0];if(!file){box.style.display="none";box.innerHTML="";return}const r=new FileReader();r.onload=e=>{box.innerHTML=`<img src="${e.target.result}"><p class="muted small">Anteprima foto caricata.</p>`;box.style.display="block"};r.readAsDataURL(file)}
@@ -411,7 +419,16 @@ async function analyzeOlivePhotoAI(){
   toast("Analisi AI in corso...");
 
   try{
-    const imageBase64 = await compressFile(file, 700, 0.45);
+    let imageBase64 = await compressFile(file, 700, 0.45);
+
+if(!imageBase64){
+  imageBase64 = await fileToDataUrl(file);
+}
+
+if(!imageBase64 || !String(imageBase64).startsWith("data:image")){
+  toast("Foto non leggibile. Prova una foto JPG/PNG oppure scattala direttamente.");
+  return;
+}
 
     const payload = {
       imageBase64,
