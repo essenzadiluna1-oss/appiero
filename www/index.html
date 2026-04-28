@@ -213,8 +213,11 @@
     <h2>Backup e memoria</h2>
     <div class="card">
       <h3>Memoria ApPiero</h3>
-      <p class="muted small" id="memoryInfo">Calcolo...</p>
-      <div class="btn-row"><button class="btn-main" onclick="cleanOld()">🧹 Pulisci vecchie versioni</button><button class="btn-gold" onclick="lightenPhotos()">🖼 Alleggerisci foto</button></div>
+      <p class="muted small" id="memoryInfo">Calcolo...</p><div class="btn-row">
+  <button class="btn-main" onclick="cleanOld()">🧹 Pulisci vecchie versioni</button>
+  <button class="btn-gold" onclick="lightenPhotos()">🖼 Alleggerisci foto</button>
+  <button class="btn-blue" onclick="clearAppCache()">🧽 Svuota cache app</button>
+</div>
     </div>
     <div class="card" style="margin-top:12px">
       <h3>Esporta backup completo</h3>
@@ -1081,6 +1084,32 @@ function renderAll(){renderHome();renderClients();renderJobs();renderStats();ren
 function backupData(includePhotos){return jobs.map(j=>{const x=JSON.parse(JSON.stringify(j));if(!includePhotos){x.photos=[];x.photoItems=(x.photoItems||[]).map(p=>({...p,src:""}));x.days=(x.days||[]).map(d=>({...d,photo:""}));x.healthChecks=(x.healthChecks||[]).map(h=>({...h,photo:""}))}return x})}
 function exportBackup(includePhotos){const fileName=(includePhotos?"BACKUP-APPIERO-COMPLETO-":"BACKUP-APPIERO-LEGGERO-")+todayISO()+".json";const data={app:"ApPiero",version:"9.0",photos:includePhotos,exportedAt:new Date().toISOString(),jobs:backupData(includePhotos)};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=fileName;a.click();URL.revokeObjectURL(url);const msg=document.getElementById("backupMsg");if(msg){msg.style.display="block";msg.innerHTML=`<strong>Backup esportato.</strong><br>Nome file:<br><strong>${fileName}</strong><br><br>Cercalo in:<br><strong>File → Memoria interna → Download</strong>`}toast("Backup salvato in Download")}
 function importBackup(){const file=document.getElementById("backupFile").files[0];if(!file)return toast("Scegli file backup dalla cartella Download");const r=new FileReader();r.onload=()=>{try{const data=JSON.parse(r.result);if(!Array.isArray(data.jobs))throw new Error();if(!confirm("Sostituire i dati attuali con questo backup?"))return;jobs=data.jobs.map(normalize);save();toast("Backup importato");showScreen("home")}catch(e){toast("Backup non valido")}};r.readAsText(file)}
+async function clearAppCache(){
+  if(!confirm("Svuotare la cache dell'app? I dati salvati non verranno cancellati.")) return;
+
+  try{
+    if("caches" in window){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+
+    if("serviceWorker" in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs){
+        await reg.update();
+      }
+    }
+
+    toast("Cache app svuotata. Riapro ApPiero...");
+    setTimeout(() => {
+      window.location.href = window.location.pathname + "?v=" + Date.now();
+    }, 1200);
+
+  }catch(e){
+    console.error(e);
+    toast("Cache non svuotata completamente");
+  }
+}
 function cleanOld(){if(!confirm("Pulisco vecchie versioni, V9 resta. Procedo?"))return;OLD_KEYS.forEach(k=>localStorage.removeItem(k));toast("Vecchie versioni pulite");renderAll()}
 async function lightenPhotos(){if(!confirm("Alleggerisco le foto già salvate. Procedo?"))return;for(const j of jobs){for(const p of j.photoItems){if(p.src)p.src=await recompressDataUrl(p.src)}for(const h of j.healthChecks){if(h.photo)h.photo=await recompressDataUrl(h.photo)}j.photos=j.photoItems.filter(p=>p.src).map(p=>p.src)}save();toast("Foto alleggerite")}
 function clearAll(){if(!confirm("Cancellare tutti i dati?"))return;if(!confirm("Confermi definitivamente?"))return;jobs=[];localStorage.removeItem(STORAGE_KEY);save();toast("Dati cancellati")}
