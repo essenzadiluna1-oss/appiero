@@ -294,8 +294,21 @@ function priceLabel(){const m=document.getElementById("fPriceMode").value;docume
 function fileToDataUrl(file){
   return new Promise((resolve)=>{
     if(!file) return resolve("");
+
     const r = new FileReader();
-    r.onload = e => resolve(e.target.result || "");
+
+    r.onload = e => {
+      let result = e.target.result || "";
+
+      // Alcuni telefoni salvano foto galleria come application/octet-stream.
+      // Se contiene base64, forziamo il prefisso immagine.
+      if(result && !String(result).startsWith("data:image") && String(result).includes(";base64,")){
+        result = "data:image/jpeg;base64," + String(result).split(";base64,")[1];
+      }
+
+      resolve(result);
+    };
+
     r.onerror = () => resolve("");
     r.readAsDataURL(file);
   });
@@ -425,8 +438,12 @@ if(!imageBase64){
   imageBase64 = await fileToDataUrl(file);
 }
 
+if(imageBase64 && !String(imageBase64).startsWith("data:image") && String(imageBase64).includes(";base64,")){
+  imageBase64 = "data:image/jpeg;base64," + String(imageBase64).split(";base64,")[1];
+}
+
 if(!imageBase64 || !String(imageBase64).startsWith("data:image")){
-  toast("Foto non leggibile. Prova una foto JPG/PNG oppure scattala direttamente.");
+  toast("Foto non leggibile. Prova a scattarla direttamente oppure scegli una foto salvata come JPG.");
   return;
 }
 
